@@ -8,7 +8,7 @@ from PIL import Image
 import uuid
 from app.utils.loadData import LoadJsonData
 from django.conf import settings
-
+from app.utils.response import Response
 
 def get_uuid():
     return uuid.uuid1()  # 根据 时间戳生成 uuid , 保证全球唯一
@@ -20,10 +20,14 @@ def show(request):
         name = str(received_file.name)
     except Exception as e:
         name = '1.jpg'
-
-    types = name.split('.')[1]
+    types = name[-3:]
+    if types != 'jpg' and types != 'png':
+        return JsonResponse(Response(code=200, data={
+            'filename': '',
+            'length': 0,
+            'url': ''
+        }, success=False, message='上传失败，格式错误'))
     filename = os.path.join(settings.MEDIA_ROOT, 'image/' + str(get_uuid()) + '.' + types)
-    print(received_file)
     saveFile(received_file, filename)
 
     return JsonResponse({

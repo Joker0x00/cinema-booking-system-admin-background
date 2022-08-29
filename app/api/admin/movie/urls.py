@@ -4,5 +4,5 @@ from django.urls import path
 from app.views.admin.movie.views import MovieView
 
 urlpatterns = [
-    path('list/', MovieView.as_view())
+    path('list/', MovieView.as_view()),
 ]

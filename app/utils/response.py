@@ -5,7 +5,7 @@ from django.core import serializers
 
 
 class Response:
-    def __init__(self, code, data, message, success=True):
+    def __init__(self, code, message, success=True, data={}):
         self.data = data
         self.message = message
         self.code = code

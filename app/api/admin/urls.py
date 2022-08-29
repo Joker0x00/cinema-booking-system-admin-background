@@ -8,4 +8,5 @@ base_path = 'app.api.admin.'
 urlpatterns = [
     path('user/', include(base_path + 'user.urls')),
     path('movie/', include(base_path + 'movie.urls')),
+    path('movie_type/', include(base_path + 'movie_type.urls')),
 ]
