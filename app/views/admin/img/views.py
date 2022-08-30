@@ -27,15 +27,16 @@ def show(request):
             'length': 0,
             'url': ''
         }, success=False, message='上传失败，格式错误'))
-    filename = os.path.join(settings.MEDIA_ROOT, 'image/' + str(get_uuid()) + '.' + types)
-    saveFile(received_file, filename)
+    filename = str(get_uuid()) + '.' + types
+    filepath = os.path.join(settings.MEDIA_ROOT, 'image/' + filename)
+    saveFile(received_file, filepath)
 
     return JsonResponse({
         'success': 'true',
         'code': 200,
         'filename': received_file.name,
         'length': received_file.size,
-        'url': 'http://127.0.0.1/media/image/' + filename
+        'url': 'http://127.0.0.1:8000/media/show/image/' + filename
     })
 
 

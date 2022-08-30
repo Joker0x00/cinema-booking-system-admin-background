@@ -2,7 +2,7 @@
 # Time: 2022/8/27 10:22
 
 from django.core import serializers
-
+from django.http.response import JsonResponse
 
 class Response:
     def __init__(self, code, message, success=True, data={}):
@@ -27,3 +27,12 @@ class Response:
             'message': self.message,
             'success': self.success
         }
+
+    def jsonResponse(self):
+        return JsonResponse({
+            'code': self.code,
+            'data': self.data,
+            'message': self.message,
+            'success': self.success,
+        })
+
