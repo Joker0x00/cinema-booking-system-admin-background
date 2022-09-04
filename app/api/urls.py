@@ -7,5 +7,6 @@ bath_path = 'app.api.'
 
 urlpatterns = [
     path('admin/', include(bath_path + 'admin.urls')),
-    path('media/', include(bath_path + 'media.urls'))
+    path('media/', include(bath_path + 'media.urls')),
+    path('export/', include(bath_path + 'export.urls'))
 ]

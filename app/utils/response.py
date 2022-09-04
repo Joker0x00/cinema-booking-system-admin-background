@@ -4,6 +4,7 @@
 from django.core import serializers
 from django.http.response import JsonResponse
 
+
 class Response:
     def __init__(self, code, message, success=True, data={}):
         self.data = data
@@ -36,3 +37,23 @@ class Response:
             'success': self.success,
         })
 
+    @staticmethod
+    def error(message="请求失败"):
+        return JsonResponse({
+            'code': '404',
+            'data': '',
+            'message': message,
+            'success': False,
+        })
+
+    @staticmethod
+    def success(data, message="请求成功"):
+        if data is None:
+            data = {}
+        print(data)
+        return JsonResponse({
+            'code': 200,
+            'data': data,
+            'message': message,
+            'success': True,
+        })

@@ -9,4 +9,6 @@ urlpatterns = [
     path('user/', include(base_path + 'user.urls')),
     path('movie/', include(base_path + 'movie.urls')),
     path('movie_type/', include(base_path + 'movie_type.urls')),
+    path('room/', include(base_path + 'room.urls')),
+    path('show/', include(base_path + 'show.urls')),
 ]

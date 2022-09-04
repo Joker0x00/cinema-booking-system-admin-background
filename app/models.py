@@ -53,6 +53,8 @@ class MovieType(models.Model):
     class Meta:
         db_table = 'movie_type'
 
+    def __str__(self):
+        return self.name
 
 class Order(models.Model):
     id = models.CharField(primary_key=True, max_length=128)
@@ -67,15 +69,18 @@ class Order(models.Model):
 class Room(models.Model):
     id = models.CharField(primary_key=True, max_length=128)
     name = models.CharField(max_length=255)
-    size = models.IntegerField()
+    row = models.IntegerField(default=0)
+    column = models.IntegerField(default=0)
+    size = models.IntegerField(default=0)
+    offset = models.IntegerField(default=0)
     seat_layout = models.CharField(max_length=1000, blank=True, null=True)
-
+    screen_width = models.IntegerField(blank=True, null=True)
     class Meta:
         db_table = 'room'
 
 
 class Show(models.Model):
-    field_id = models.CharField(db_column=' id', primary_key=True,
+    id = models.CharField(db_column='id', primary_key=True,
                                 max_length=128)  # Field renamed to remove unsuitable characters. Field renamed because it started with '_'.
     movie_id = models.CharField(max_length=255)
     room_id = models.CharField(max_length=255)
@@ -97,3 +102,4 @@ class User(models.Model):
 
     class Meta:
         db_table = 'user'
+
