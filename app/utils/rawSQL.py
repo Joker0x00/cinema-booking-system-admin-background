@@ -40,3 +40,11 @@ def query_one_dict(sql, params=None):
         row = cursor.fetchone()
         tMap = dict(zip(col_names, row))
         return tMap
+
+
+def execSql(sql, params=None):
+    with connection.cursor() as cursor:
+        if params:
+            cursor.execute(sql, params=params)
+        else:
+            cursor.execute(sql)

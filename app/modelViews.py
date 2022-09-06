@@ -40,3 +40,22 @@ class ShowView(models.Model):
         managed = False  # Created from a view. Don't remove.
         db_table = 'show_view'
 
+
+class OrderDetail(models.Model):
+    id = models.CharField(max_length=128, db_collation='utf8mb4_0900_ai_ci', primary_key=True)
+    moviename = models.CharField(db_column='movieName', max_length=255, db_collation='utf8mb4_0900_ai_ci')  # Field name made lowercase.
+    start_time = models.DateTimeField()
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    show_id = models.CharField(max_length=128, db_collation='utf8mb4_0900_ai_ci')
+    choose_seat = models.CharField(max_length=1024, db_collation='utf8mb4_0900_ai_ci', blank=True, null=True)
+    user_id = models.CharField(max_length=128, db_collation='utf8mb4_0900_ai_ci')
+    username = models.CharField(max_length=255, db_collation='utf8mb4_0900_ai_ci')
+    create_time = models.DateTimeField(blank=True, null=True)
+    roomname = models.CharField(db_column='roomName', max_length=255, db_collation='utf8mb4_0900_ai_ci')  # Field name made lowercase.
+    room_id = models.CharField(max_length=128, db_collation='utf8mb4_0900_ai_ci')
+    movie_id = models.CharField(max_length=128, db_collation='utf8mb4_0900_ai_ci')
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    num = models.IntegerField(default=0)
+    class Meta:
+        managed = False  # Created from a view. Don't remove.
+        db_table = 'order_detail'

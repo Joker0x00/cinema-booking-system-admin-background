@@ -12,13 +12,15 @@ from django.http import JsonResponse
 
 from app.utils.loadData import LoadJsonData
 from app.utils.response import Response
-from app.utils import select
+from app.utils import rawSQL
 
-class Room(View):
+
+class RoomTable(View):
     def get(self, request):
         sql = 'select id, `id` as value, `name` as text, `name` as label from room'
-        res = select.query_all_dict(sql)
+        res = rawSQL.query_all_dict(sql)
         return JsonResponse(Response(code=200, success=True, message='成功获取放映厅', data=res).normal())
+
 
 class RoomView(View):
     """获取所有放映厅分页信息"""
@@ -103,3 +105,27 @@ class RoomView(View):
         obj.delete()
         return Response(code=200, success=True, message='删除成功').jsonResponse()
 
+
+class RoomDetail(View):
+    def get(self, request):
+        movie_id = request.GET.get('movie_id', '')
+        if not movie_id:
+            return Response.error('需要电影id')
+        sql = """
+            SELECT
+                room.id AS id, 
+                room.`name` AS `name`
+            FROM
+                `show`
+                INNER JOIN
+                    room
+                ON 
+                    `show`.room = room.id
+                INNER JOIN
+                    movie
+                ON 
+                    `show`.movie = movie.id
+            WHERE `show`.`movie` = %s
+        """
+        data = rawSQL.query_all_dict(sql, params=(movie_id,))
+        return Response.success(data=data, message='成功获取放映厅数据')

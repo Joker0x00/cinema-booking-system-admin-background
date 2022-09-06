@@ -10,7 +10,8 @@ from app.utils.Pageination import Pagination
 from django.http import JsonResponse
 from app.utils.loadData import LoadJsonData
 from app.utils.response import Response
-from app.utils import select
+from app.utils import rawSQL
+from app.utils.rawSQL import execSql, query_one_dict
 
 class ShowView(View):
     def get(self, request):
@@ -44,17 +45,17 @@ class ShowView(View):
         form = LoadJsonData(request.body).get_data().get('form', {})
         print(form)
         movie_id = form['movie_id']
-        movie_obj = Movie.objects.filter(id=movie_id).first()
         room_id = form['room_id']
-        room_obj = Room.objects.filter(id=room_id).first()
-        obj = Show(
-            id=uuid.uuid1(),
-            movie_id=movie_obj,
-            room_id=room_obj,
-            start_time=form['start_time'],
-            price=form['price']
-        )
-        obj.save()
+        dateTime = form['start_time'].split('T')
+        date = dateTime[0]
+        time = dateTime[1].split('.')[0]
+        print(date + ' ' + time)
+        sql = 'insert into `show`' \
+              '(id, movie, room, start_time, price) ' \
+              'VALUES' \
+              ' ("{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), movie_id, room_id, date + ' ' + time, form['price'])
+        print(sql)
+        execSql(sql)
         return Response.success(message='新增成功')
 
     def put(self, request):
@@ -66,26 +67,57 @@ class ShowView(View):
             'start_time': raw_form.get('start_time', ''),
             'price': raw_form.get('price', ''),
         }
-        # 数据验证和处理
-        movie_obj = Movie.objects.filter(id=form['movie_id']).first()
-        room_obj = Room.objects.filter(id=form['room_id']).first()
-        show_obj = Show.objects.filter(id=form['id']).first()
-        show_obj.movie_id = movie_obj
-        show_obj.room_id = room_obj
-        show_obj.start_time = form['start_time']
-        show_obj.seat_layout = form['seat_layout']
-        show_obj.price = form['price']
-        show_obj.save()
-
+        dateTime = form['start_time'].split('T')
+        date = dateTime[0]
+        time = dateTime[1].split('Z')[0]
+        sql = 'update `show` set movie="%s", room="%s", start_time="%s", price="%s" where id="%s"'
+        params = (form['movie_id'], form['room_id'], date + ' ' + time, form['price'], form['id'])
+        execSql(sql=sql, params=(form['movie_id'], form['room_id'], date + ' ' + time, form['price'], form['id']))
         return JsonResponse(Response(code=200, success=True, message='修改成功').normal())
 
     def delete(self, request):
         showId = LoadJsonData(request.body).get_data().get('id', '')
-        print('Delete Type:Room id:' + showId)
+        print('Delete Type:Show id:' + showId)
+        print(showId)
         if not showId:
             return Response(code=404, success=False, message='删除失败，id为空').jsonResponse()
-        obj = Show.objects.filter(id=showId).first()
-        if not obj:
+        sql = 'select `id` from `show` where `id`=%s'
+        params = (showId,)
+        data = query_one_dict(sql, params)
+        print(data)
+        if not data:
             return Response(code=404, success=False, message='删除失败，检索不到').jsonResponse()
-        obj.delete()
+        sql = 'delete from `show` where `id`=%s'
+        params = (showId, )
+        execSql(sql, params)
         return Response(code=200, success=True, message='删除成功').jsonResponse()
+
+
+class ShowDetail(View):
+    def get(self, request):
+        movie_id = request.GET.get('movie_id', '')
+        room_id = request.GET.get('room_id', '')
+        if not movie_id or not room_id:
+            return Response.error('需要电影id或放映厅id')
+        sql = """
+            SELECT
+                `show`.id AS show_id, 
+                `show`.start_time AS start_time, 
+                `show`.price AS price
+            FROM
+                `show`
+                INNER JOIN
+                room
+                ON 
+                    `show`.room = room.id
+                INNER JOIN
+                movie
+                ON 
+                    `show`.movie = movie.id
+            WHERE `show`.`movie` = %s AND `show`.`room` = %s
+        """
+        print(movie_id)
+        print(room_id)
+        data = rawSQL.query_all_dict(sql, params=(movie_id, room_id))
+        print(data)
+        return Response.success(data, message='成功获取放映数据')

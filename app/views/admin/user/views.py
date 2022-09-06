@@ -1,11 +1,17 @@
 # Author: wy
 # Time: 2022/8/27 10:36
+import uuid
 
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+
+from app.utils.Pageination import Pagination
 from app.utils.response import Response
 from app.utils.loadData import LoadJsonData
-
+from app.utils import rawSQL
+from django.views import View
+from app.models import Admin, User
 
 def get_user_info(request):
     # print(request.GET.get('token'))
@@ -109,7 +115,7 @@ def get_user_info(request):
     }
     return JsonResponse(res)
 
-
+# 登录
 def login(request):
     data = LoadJsonData(request.body).get_data()
     res = {
@@ -122,7 +128,7 @@ def login(request):
     }
     return JsonResponse(res)
 
-
+# 登出
 def logout(request):
     res = {
         "success": True,
@@ -131,3 +137,152 @@ def logout(request):
         "data": {}
     }
     return JsonResponse(res)
+
+
+class AdministratorView(View):
+    def get(self, request):
+        key = request.GET.get('key', '')
+        sql = 'select * from admin where `name` like "{}"'.format('%' + key + '%')
+        rows = rawSQL.query_all_dict(sql)
+        cnt = len(rows)
+        data = {
+            'count': cnt,
+            'rows': rows,
+        }
+        return JsonResponse(Response(code=200, data=data, message='成功获取管理员信息').normal(), safe=False)
+
+    def post(self, request):
+        form = LoadJsonData(request.body).get_data().get('form', {})
+        name = form['name']
+        password = form['password']
+        raw_roles = form['role']
+        roles = ''
+        create_time = timezone.now()
+        for role in raw_roles:
+            if role == 'superAdmin':
+                roles = 'superAdmin,'
+                break
+            roles += role + ','
+        if roles[len(roles) - 1] == ',':
+            roles = roles[:-1]
+        sql = 'insert into `admin`' \
+              '(`id`, `name`, `password`, `role`, `create_time`) ' \
+              'VALUES' \
+              ' ("{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), name, password, roles, create_time)
+        rawSQL.execSql(sql)
+        return Response.success(message='新增成功')
+
+    def put(self, request):
+        raw_form = LoadJsonData(request.body).get_data().get('form', {})
+        form = {
+            'id': raw_form.get('id', ''),
+            'name': raw_form.get('name', ''),
+            'password': raw_form.get('password', ''),
+            'role': raw_form.get('role', ''),
+        }
+        roles = ''
+        for role in form['role']:
+            if role == 'superAdmin':
+                roles = 'superAdmin,'
+                break
+            roles += role + ','
+        if roles[len(roles) - 1] == ',':
+            roles = roles[:-1]
+        form['role'] = roles
+        sql = 'update `admin` set `name`=%s, `password`=%s, `role`=%s where `id`=%s'
+        rawSQL.execSql(sql=sql, params=(form['name'], form['password'], form['role'], form['id']))
+        return JsonResponse(Response(code=200, success=True, message='修改成功').normal())
+
+    def delete(self, request):
+        adminId = LoadJsonData(request.body).get_data().get('id', '')
+        print('Delete Type:Admin id:' + adminId)
+        if not adminId:
+            return Response(code=404, success=False, message='删除失败，id为空').jsonResponse()
+        sql = 'select `id` from `admin` where `id`=%s'
+        params = (adminId,)
+        data = rawSQL.query_one_dict(sql, params)
+        if not data:
+            return Response(code=404, success=False, message='删除失败，检索不到').jsonResponse()
+        sql = 'delete from `admin` where `id`=%s'
+        params = (adminId,)
+        rawSQL.execSql(sql, params)
+        return Response(code=200, success=True, message='删除成功').jsonResponse()
+
+
+class UserView(View):
+    def get(self, request):
+        # 处理参数
+        current_page = int(request.GET.get('page', 1))
+        limit = int(request.GET.get('limit', 20))
+        vague = request.GET.get('vague', 'false')
+        vague = True if vague == 'true' else False
+        searchstring = request.GET.get('searchParams', None)
+        searchParams = [{'key': '', 'value': ''}]
+        if searchstring:
+            searchParams = eval(searchstring)
+        # 处理筛选条件
+        condition = {}
+        for params in searchParams:
+            if params.get('value', ''):
+                condition[params['key'] + ('__contains' if vague else '')] = params['value']
+        raw_data = User.objects.filter(**condition).values()
+        raw_data = list(raw_data)
+        cnt = len(raw_data)
+        start, end = Pagination(current_page=current_page, limit=limit, count=cnt).get_result()
+        rows = raw_data[start: end]
+        data = {
+            'count': cnt,
+            'rows': rows,
+        }
+        return JsonResponse(Response(code=200, data=data, message='成功获取用户信息').normal(), safe=False)
+
+    def post(self, request):
+        form = LoadJsonData(request.body).get_data().get('form', {})
+        name = form.get('name', '')
+        password = form.get('password', '')
+        sex = form.get('sex', '')
+        birthday = form.get('birthday', '')
+        phone_number = form.get('form_number', '')
+        sql = 'insert into `user`' \
+              '(`id`, `name`, `password`, `sex`, `phone_number`) ' \
+              'VALUES' \
+              '("{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), name, password, sex, birthday, phone_number)
+        rawSQL.execSql(sql)
+        return Response.success(message='新增成功')
+
+    def put(self, request):
+        raw_form = LoadJsonData(request.body).get_data().get('form', {})
+        form = {
+            'id': raw_form.get('id', ''),
+            'name': raw_form.get('name', ''),
+            'password': raw_form.get('password', ''),
+            'sex': raw_form.get('sex', ''),
+            'phone_number': raw_form.get('phone_number', ''),
+        }
+        sql = 'update `user` set `name`=%s, `password`=%s, `sex`=%s, `phone_number`=%s where id=%s'
+        params = (form['name'], form['password'], form['sex'], form['phone_number'], form['id'])
+        rawSQL.execSql(sql=sql, params=params)
+        return JsonResponse(Response(code=200, success=True, message='修改成功').normal())
+
+    def delete(self, request):
+        user_id = LoadJsonData(request.body).get_data().get('id', '')
+        print('Delete Type:User id:' + user_id)
+        if not user_id:
+            return Response(code=404, success=False, message='删除失败，id为空').jsonResponse()
+        sql = 'select `id` from `user` where `id`=%s'
+        params = (user_id,)
+        data = rawSQL.query_one_dict(sql, params)
+        if not data:
+            return Response(code=404, success=False, message='删除失败，检索不到').jsonResponse()
+        sql = 'delete from `user` where `id`=%s'
+        params = (user_id, )
+        rawSQL.execSql(sql, params)
+        return Response(code=200, success=True, message='删除成功').jsonResponse()
+
+
+class UserName(View):
+    def get(self, request):
+        sql = 'select `id`, `name` from `user`'
+        data = rawSQL.query_all_dict(sql)
+        print(data)
+        return Response.success(data, message='成功获取用户名')

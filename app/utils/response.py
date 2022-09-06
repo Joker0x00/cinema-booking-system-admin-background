@@ -47,10 +47,9 @@ class Response:
         })
 
     @staticmethod
-    def success(data, message="请求成功"):
+    def success(data=None, message="请求成功"):
         if data is None:
             data = {}
-        print(data)
         return JsonResponse({
             'code': 200,
             'data': data,

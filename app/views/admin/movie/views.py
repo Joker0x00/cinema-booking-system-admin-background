@@ -12,12 +12,12 @@ from django.http import JsonResponse
 
 from app.utils.loadData import LoadJsonData
 from app.utils.response import Response
-from app.utils import select
+from app.utils import rawSQL
 
-class Movie(View):
+class MovieTable(View):
     def get(self, request):
         sql = 'select id, `id` as value, `name` as text, `name` as label from movie'
-        res = select.query_all_dict(sql)
+        res = rawSQL.query_all_dict(sql)
         return JsonResponse(Response(code=200, success=True, message='成功获取电影信息', data=res).normal())
 
 class MovieView(View):
@@ -58,7 +58,8 @@ class MovieView(View):
 
     def post(self, request):
         form = LoadJsonData(request.body).get_data().get('form', {})
-        category = MovieType.objects.filter(id=form['category_id']).first()
+        print(form['category_id'])
+        category = MovieType.objects.filter(id=int(form['category_id'])).first()
         print(form['image'][5:])
         url = form['image'][5:]
         print(url)
