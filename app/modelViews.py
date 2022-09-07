@@ -56,6 +56,7 @@ class OrderDetail(models.Model):
     movie_id = models.CharField(max_length=128, db_collation='utf8mb4_0900_ai_ci')
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     num = models.IntegerField(default=0)
+    status = models.CharField(max_length=30)
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = 'order_detail'

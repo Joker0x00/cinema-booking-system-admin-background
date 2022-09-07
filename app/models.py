@@ -66,6 +66,7 @@ class Order(models.Model):
     create_time = models.DateTimeField()
     num = models.IntegerField(default=0)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=30)
     class Meta:
         db_table = 'order'
 
@@ -90,7 +91,7 @@ class Show(models.Model):
     room = models.ForeignKey('Room', models.DO_NOTHING)
     start_time = models.DateTimeField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
-
+    seat_layout = models.CharField(max_length=1000, blank=True, null=True)
     class Meta:
         db_table = 'show'
 

@@ -46,14 +46,20 @@ class ShowView(View):
         print(form)
         movie_id = form['movie_id']
         room_id = form['room_id']
+        sql = """
+            select seat_layout
+            from `room`
+            where `id` = %s
+        """
+        seat_layout = (rawSQL.query_one_dict(sql, params=(room_id, )))['seat_layout']
         dateTime = form['start_time'].split('T')
         date = dateTime[0]
         time = dateTime[1].split('.')[0]
         print(date + ' ' + time)
         sql = 'insert into `show`' \
-              '(id, movie, room, start_time, price) ' \
+              '(id, movie, room, start_time, price, seat_layout) ' \
               'VALUES' \
-              ' ("{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), movie_id, room_id, date + ' ' + time, form['price'])
+              ' ("{}", "{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), movie_id, room_id, date + ' ' + time, form['price'], seat_layout)
         print(sql)
         execSql(sql)
         return Response.success(message='新增成功')
@@ -97,6 +103,26 @@ class ShowDetail(View):
     def get(self, request):
         movie_id = request.GET.get('movie_id', '')
         room_id = request.GET.get('room_id', '')
+        show_id = request.GET.get('show_id', '')
+        if show_id:
+            sql = """
+                SELECT
+                    `show`.seat_layout AS seat_layout, 
+                    room.size AS size, 
+                    room.`column` AS `column`, 
+                    room.`row` AS `row`, 
+                    room.`offset` AS `offset`, 
+                    room.screen_width AS screen_width
+                FROM
+                    `show`
+                    INNER JOIN
+                    room
+                    ON 
+                        `show`.room = room.id
+                WHERE `show`.id = %s
+            """
+            layout = (rawSQL.query_one_dict(sql, params=(show_id, )))
+            return Response.success(layout, '成功获取放映厅信息和座位数据')
         if not movie_id or not room_id:
             return Response.error('需要电影id或放映厅id')
         sql = """

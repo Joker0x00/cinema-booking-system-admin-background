@@ -3,6 +3,7 @@
 import uuid
 
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views import View
 
 from app.utils.Pageination import Pagination
@@ -44,15 +45,16 @@ class OrderView(View):
 
     def post(self, request):
         form = LoadJsonData(request.body).get_data().get('form', {})
-        print(form)
         show_id = form['show_id']
         choose_seat = form['choose_seat']
         user_id = form['user_id']
+        num = form['num']
+        total_price = form['total_price']
+        status = form['status']
         sql = 'insert into `order`' \
-              '(id, show_id, choose_seat, user_id) ' \
+              '(id, show_id, choose_seat, user_id, create_time, num, total_price, status) ' \
               'VALUES' \
-              ' ("{}", "{}", "{}", "{}")'.format(uuid.uuid1(), show_id, choose_seat, user_id)
-        print(sql)
+              ' ("{}", "{}", "{}", "{}" ,"{}", "{}", "{}", "{}")'.format(uuid.uuid1(), show_id, choose_seat, user_id, timezone.now(), num, total_price, status)
         rawSQL.execSql(sql)
         return Response.success(message='新增成功')
 
@@ -62,10 +64,12 @@ class OrderView(View):
             'id': raw_form.get('id', ''),
             'show_id': raw_form.get('movie_id', ''),
             'choose_seat': raw_form.get('choose_seat', ''),
-            'user_id': raw_form.get('user_id', '')
+            'user_id': raw_form.get('user_id', ''),
+            'num': raw_form.get('num', 0),
+            'total_price': raw_form.get('total_price', 0)
         }
-        sql = 'update `order` set show_id="%s", choose_seat="%s", user_id="%s" where id="%s"'
-        params = (form['show_id'], form['choose_seat'], form['user_id'], form['id'])
+        sql = 'update `order` set show_id="%s", choose_seat="%s", user_id="%s", num=%d, total_price=%f where id="%s"'
+        params = (form['show_id'], form['choose_seat'], form['user_id'],form['num'], form['total_price'], form['id'])
         rawSQL.execSql(sql=sql, params=params)
         return JsonResponse(Response(code=200, success=True, message='修改成功').normal())
 
@@ -84,3 +88,16 @@ class OrderView(View):
         params = (order_id,)
         rawSQL.execSql(sql, params)
         return Response(code=200, success=True, message='删除成功').jsonResponse()
+
+
+class OrderRefund(View):
+    def post(self, request, id):
+        if not id:
+            return Response.error(message='需提供id')
+        sql = """
+            update `order`
+            set `status` = '已退票'
+            where `id` = %s
+        """
+        rawSQL.execSql(sql, params=(id,))
+        return Response.success(message='退票成功')
