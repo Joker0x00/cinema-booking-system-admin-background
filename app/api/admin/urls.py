@@ -11,5 +11,6 @@ urlpatterns = [
     path('movie_type/', include(base_path + 'movie_type.urls')),
     path('room/', include(base_path + 'room.urls')),
     path('show/', include(base_path + 'show.urls')),
-    path('order/', include(base_path + 'order.urls'))
+    path('order/', include(base_path + 'order.urls')),
+    path('comment/', include(base_path + 'comment.urls'))
 ]

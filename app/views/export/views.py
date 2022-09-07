@@ -6,7 +6,7 @@ from django.views import View
 from app.utils.response import Response
 from app.utils.loadData import LoadJsonData
 from app.models import Room, MovieType, Admin, User
-from app.modelViews import MovieView, ShowView, OrderDetail
+from app.modelViews import MovieView, ShowView, OrderDetail, CommentDetail
 import csv
 from django.http import HttpResponse, StreamingHttpResponse
 from app.utils import rawSQL
@@ -65,6 +65,13 @@ def export_Order(request, config):
     objs = list(objs)
     return Response.success(data=objs, message='成功获取文件数据')
 
+def export_Comment(request, config):
+    fields = tuple(config['fields'])
+    objs = CommentDetail.objects.all().values(*fields)
+    objs = list(objs)
+    return Response.success(data=objs, message='成功获取文件数据')
+
+
 class TableExportView(View):
     def post(self, request, table_name):
         if table_name == '':
@@ -85,5 +92,7 @@ class TableExportView(View):
             return export_User(request, config)
         elif table_name == 'Order':
             return export_Order(request, config)
+        elif table_name == 'Comment':
+            return export_Comment(request, config)
         else:
             return Response.error('需提供表名')

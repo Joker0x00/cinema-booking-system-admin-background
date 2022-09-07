@@ -26,10 +26,11 @@ class Admin(models.Model):
 
 class Comment(models.Model):
     id = models.CharField(primary_key=True, max_length=128)
-    score = models.DecimalField(max_digits=4, decimal_places=1, blank=True, null=True)
+    score = models.DecimalField(max_digits=3, decimal_places=1, blank=True, null=True)
     comments = models.CharField(max_length=700, blank=True, null=True)
     from_user = models.ForeignKey('User', models.DO_NOTHING, blank=True, null=True)
-
+    create_time = models.DateTimeField()
+    movie = models.ForeignKey('Movie', models.DO_NOTHING)
     class Meta:
         db_table = 'comment'
 
