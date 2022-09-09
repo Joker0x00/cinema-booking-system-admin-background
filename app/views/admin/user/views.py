@@ -243,10 +243,11 @@ class UserView(View):
         sex = form.get('sex', '')
         birthday = form.get('birthday', '')
         phone_number = form.get('form_number', '')
+        balance = form.get('balance', 0)
         sql = 'insert into `user`' \
-              '(`id`, `name`, `password`, `sex`, `phone_number`) ' \
+              '(`id`, `name`, `password`, `sex`, `phone_number`, `balance`) ' \
               'VALUES' \
-              '("{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), name, password, sex, birthday, phone_number)
+              '("{}", "{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), name, password, sex, birthday, phone_number, balance)
         rawSQL.execSql(sql)
         return Response.success(message='新增成功')
 
@@ -258,9 +259,10 @@ class UserView(View):
             'password': raw_form.get('password', ''),
             'sex': raw_form.get('sex', ''),
             'phone_number': raw_form.get('phone_number', ''),
+            'balance': float(raw_form.get('balance', 0))
         }
-        sql = 'update `user` set `name`=%s, `password`=%s, `sex`=%s, `phone_number`=%s where id=%s'
-        params = (form['name'], form['password'], form['sex'], form['phone_number'], form['id'])
+        sql = 'update `user` set `name`=%s, `password`=%s, `sex`=%s, `phone_number`=%s, `balance`=%s where id=%s'
+        params = (form['name'], form['password'], form['sex'], form['phone_number'], form['balance'], form['id'])
         rawSQL.execSql(sql=sql, params=params)
         return JsonResponse(Response(code=200, success=True, message='修改成功').normal())
 

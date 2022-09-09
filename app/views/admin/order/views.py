@@ -1,5 +1,6 @@
 # Author: wy
 # Time: 2022/9/6 15:30
+import decimal
 import uuid
 
 from django.http import JsonResponse
@@ -49,29 +50,41 @@ class OrderView(View):
         choose_seat = form['choose_seat']
         user_id = form['user_id']
         num = form['num']
-        total_price = form['total_price']
+        total_price = float(form['total_price'])
         status = form['status']
+        layout = form['layout']
+        # 余额是否够
+        sql = """
+            select `balance`
+            from `user`
+            where `id` = %s
+        """
+        user_balance = (rawSQL.query_one_dict(sql, (user_id, )))['balance']
+        if user_balance < total_price:
+            return Response.error('余额不足')
+        # 新增订单
         sql = 'insert into `order`' \
               '(id, show_id, choose_seat, user_id, create_time, num, total_price, status) ' \
               'VALUES' \
               ' ("{}", "{}", "{}", "{}" ,"{}", "{}", "{}", "{}")'.format(uuid.uuid1(), show_id, choose_seat, user_id, timezone.now(), num, total_price, status)
         rawSQL.execSql(sql)
+        # 更新show的座位布局
+        sql = """
+            update `show`
+            set `seat_layout` = %s
+            where `id` = %s
+        """
+        rawSQL.execSql(sql, (layout, show_id))
+        # 用户余额划款
+        user_balance -= decimal.Decimal(total_price)
+        print(user_balance)
+        sql = """
+            update `user`
+            set `balance` = %s
+            where `id` = %s
+        """
+        rawSQL.execSql(sql, (user_balance, user_id))
         return Response.success(message='新增成功')
-
-    def put(self, request):
-        raw_form = LoadJsonData(request.body).get_data().get('form', {})
-        form = {
-            'id': raw_form.get('id', ''),
-            'show_id': raw_form.get('movie_id', ''),
-            'choose_seat': raw_form.get('choose_seat', ''),
-            'user_id': raw_form.get('user_id', ''),
-            'num': raw_form.get('num', 0),
-            'total_price': raw_form.get('total_price', 0)
-        }
-        sql = 'update `order` set show_id="%s", choose_seat="%s", user_id="%s", num=%d, total_price=%f where id="%s"'
-        params = (form['show_id'], form['choose_seat'], form['user_id'],form['num'], form['total_price'], form['id'])
-        rawSQL.execSql(sql=sql, params=params)
-        return JsonResponse(Response(code=200, success=True, message='修改成功').normal())
 
     def delete(self, request):
         order_id = LoadJsonData(request.body).get_data().get('id', '')
@@ -94,6 +107,24 @@ class OrderRefund(View):
     def post(self, request, id):
         if not id:
             return Response.error(message='需提供id')
+        sql = """
+            select `user`.id as user_id, `user`.balance as user_balance, `order`.total_price as total_price
+            from `user`
+                inner join
+                `order`
+                on `user`.id = `order`.user_id
+            where `order`.id = %s
+        """
+        info = rawSQL.query_one_dict(sql, (id, ))
+        user_id = info['user_id']
+        user_balance = info['user_balance']
+        user_balance += info['total_price']
+        sql = """
+            update `user`
+            set `balance` = %s
+            where `id` = %s
+        """
+        rawSQL.execSql(sql, (user_balance, user_id))
         sql = """
             update `order`
             set `status` = '已退票'

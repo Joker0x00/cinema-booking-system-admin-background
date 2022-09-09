@@ -19,8 +19,6 @@ class MovieView(models.Model):
         managed = False  # Created from a view. Don't remove.
         db_table = 'moive_view'
 
-from django.db import models
-
 
 class ShowView(models.Model):
     id = models.CharField(max_length=128, db_collation='utf8mb4_0900_ai_ci', primary_key=True)
@@ -67,9 +65,9 @@ class CommentDetail(models.Model):
     score = models.DecimalField(max_digits=3, decimal_places=1, blank=True, null=True)
     comments = models.CharField(max_length=700, db_collation='utf8mb4_0900_ai_ci', blank=True, null=True)
     user_id = models.CharField(max_length=128, db_collation='utf8mb4_0900_ai_ci')
-    username = models.CharField(db_column='userName', max_length=255, db_collation='utf8mb4_0900_ai_ci')  # Field name made lowercase.
+    userName = models.CharField(db_column='userName', max_length=255, db_collation='utf8mb4_0900_ai_ci')  # Field name made lowercase.
     movie_id = models.CharField(max_length=128, db_collation='utf8mb4_0900_ai_ci')
-    moviename = models.CharField(db_column='movieName', max_length=255, db_collation='utf8mb4_0900_ai_ci')  # Field name made lowercase.
+    movieName = models.CharField(db_column='movieName', max_length=255, db_collation='utf8mb4_0900_ai_ci')  # Field name made lowercase.
     create_time = models.DateTimeField(blank=True, null=True)
 
     class Meta:

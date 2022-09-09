@@ -19,8 +19,7 @@ class CommentView(View):
         # 处理参数
         current_page = int(request.GET.get('page', 1))
         limit = int(request.GET.get('limit', 20))
-        vague = request.GET.get('vague', 'false')
-        vague = True if vague == 'true' else False
+        sort = request.GET.get('sort', '')
         searchstring = request.GET.get('searchParams', None)
         searchParams = [{'key': '', 'value': ''}]
         if searchstring:
@@ -29,15 +28,44 @@ class CommentView(View):
         condition = {}
         for params in searchParams:
             if params.get('value', ''):
-                condition[params['key'] + ('__contains' if vague else '')] = params['value']
+                condition[params['key']] = params['value']
+        rows = []
         print(condition)
-        # 1
+        if sort == 'desc':
+            sql = """
+            select * from `comment_detail`
+            where `movie_id` = %s
+            order by score desc
+        """
+            rows = rawSQL.query_all_dict(sql, params=(condition.get('movie_id', ''), ))
+        elif sort == 'asc':
+            sql = """
+                        select * from `comment_detail`
+                        where `movie_id` = %s
+                        order by `score` asc
+                    """
+            rows = rawSQL.query_all_dict(sql, params=(condition.get('movie_id', ''),))
+        elif condition.get('movie_id', '') != '':
+            print('here')
+            sql = """
+                select * from `comment_detail`
+                where `movie_id` = %s
+                order by `create_time` desc 
+            """
+            rows = rawSQL.query_all_dict(sql, params=(condition.get('movie_id', ''),))
+        else:
+            sql = """
+                select * from `comment_detail`
+                order by `create_time` desc
+            """
+            rows = rawSQL.query_all_dict(sql)
+        print(rows)
         raw_data = CommentDetail.objects.filter(**condition).values()
         raw_data = list(raw_data)
         cnt = len(raw_data)
         start, end = Pagination(current_page=current_page, limit=limit, count=cnt).get_result()
-        rows = raw_data[start: end]
-        print(rows)
+        rows = rows[start: end]
+        # print(rows)
         data = {
             'count': cnt,
             'rows': rows,
