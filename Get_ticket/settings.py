@@ -149,3 +149,34 @@ CORS_ORIGIN_WHITELIST = (
     'http://localhost:9528',
 )
 CORS_ALLOW_CREDENTIALS = True  # 允许携带cookie
+
+CACHES = {
+    # 默认缓存
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/0',
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "PASSWORD": 'root'
+        },
+    },
+    # 用户验证码
+    "code": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "PASSWORD": 'root'
+        }
+    },
+    # Token信息
+    "token": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/2",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "PASSWORD": 'root'
+        }
+    },
+}
+USER_AGENTS_CACHE = 'default'

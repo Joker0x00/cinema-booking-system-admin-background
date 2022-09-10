@@ -4,14 +4,17 @@ import uuid
 
 from django.http import JsonResponse
 from django.utils import timezone
+from django_redis import get_redis_connection
 from django.views.decorators.csrf import csrf_exempt
 
 from app.utils.Pageination import Pagination
 from app.utils.response import Response
 from app.utils.loadData import LoadJsonData
 from app.utils import rawSQL
+from app.utils.CodeService import check_code
 from django.views import View
 from app.models import Admin, User
+from app.utils.UserConfirmService import UserConfirm
 
 def get_user_info(request):
     # print(request.GET.get('token'))
@@ -118,10 +121,24 @@ def get_user_info(request):
 # 登录
 def login(request):
     data = LoadJsonData(request.body).get_data()
+    username = data.get('username', '')
+    password = data.get('password', '')
+    isAdmin = data.get('isAdmin', '')
+    code = data.get('code', '')
+    code_id = data.get('code_id', '')
+    print(data)
+    if not (username != '' and password != '' and isAdmin != '' and code_id != '' and code != ''):
+        return Response.error('登录信息不全')
+    success, message = UserConfirm(username, password, isAdmin, code_id, code)
+    # 登录失败
+    if not success:
+        return Response.error(message)
+    # 登录成功
+    print(success)
     res = {
-        "success": True,
+        "success": success,
         "code": 20000,
-        "message": "成功",
+        "message": "登录成功",
         "data": {
             "token": "eyJhbGciOiJIUzUxMiIsInppcCI6IkdaSVAifQ.H4sIAAAAAAAAAKtWKi5NUrJSSkzJzcxT0lFKrShQsjI0MzM0NTI2NTaqBQCV9puSIAAAAA.awM_i4jsrGgU7pJScZ1LKGy2Es82oMa23WezBKAKeDjO27-yccTC_nTPkQmvQvB2_qrTK44GZEXRA9qb1mpD3Q"
         }
