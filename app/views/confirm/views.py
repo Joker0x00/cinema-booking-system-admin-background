@@ -20,7 +20,7 @@ class ConfirmCode(View):
     def get(self, request):
         img, code = check_code()
         code_id = str(uuid.uuid1())
-        conn = get_redis_connection('default')
+        conn = get_redis_connection('code')
         conn.set(code_id, code, 60)
         print(code_id, code)
         # stream = BytesIO()

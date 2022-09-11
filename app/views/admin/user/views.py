@@ -15,9 +15,24 @@ from app.utils.CodeService import check_code
 from django.views import View
 from app.models import Admin, User
 from app.utils.UserConfirmService import UserConfirm
-
+from app.utils.TokenService import setToken
+from app.utils.TokenService import getUser
+from app.utils import rawSQL
 def get_user_info(request):
-    # print(request.GET.get('token'))
+    user_token = request.GET.get('token')
+    user_id = getUser(user_token)
+    if not user_id:
+        return Response.error('登录过期，请重新登陆')
+    sql = """
+        select `name`, `password`, `role`
+        from `admin`
+        where `id` = %s
+    """
+    users = rawSQL.query_all_dict(sql, (user_id, ))
+    if not len(users):
+        return Response.error('登录过期，请重新登录')
+    user = users[0]
+
     res = {
         'code': 200,
         'data': {
@@ -59,58 +74,9 @@ def get_user_info(request):
                 "Sku",
                 "TradeMark"
             ],
-            "buttons": [
-                "cuser.detail",
-                "cuser.update",
-                "cuser.delete",
-                "btn.User.add",
-                "btn.User.remove",
-                "btn.User.update",
-                "btn.User.assgin",
-                "btn.Role.assgin",
-                "btn.Role.add",
-                "btn.Role.update",
-                "btn.Role.remove",
-                "btn.Permission.add",
-                "btn.Permission.update",
-                "btn.Permission.remove",
-                "btn.Activity.add",
-                "btn.Activity.update",
-                "btn.Activity.rule",
-                "btn.Coupon.add",
-                "btn.Coupon.update",
-                "btn.Coupon.rule",
-                "btn.OrderList.detail",
-                "btn.OrderList.Refund",
-                "btn.UserList.lock",
-                "btn.Category.add",
-                "btn.Category.update",
-                "btn.Category.remove",
-                "btn.Trademark.add",
-                "btn.Trademark.update",
-                "btn.Trademark.remove",
-                "btn.Attr.add",
-                "btn.Attr.update",
-                "btn.Attr.remove",
-                "btn.Spu.add",
-                "btn.Spu.addsku",
-                "btn.Spu.update",
-                "btn.Spu.skus",
-                "btn.Spu.delete",
-                "btn.Sku.updown",
-                "btn.Sku.update",
-                "btn.Sku.detail",
-                "btn.Sku.remove",
-                "btn.Role.a",
-                "btn.add1",
-                "btn.add2",
-                "btn.Add3",
-                "btn.edit"
-            ],
-            "roles": [
-                "普通员工"
-            ],
-            "name": "admin",
+            "role": user['role'],
+            "id": user_id,
+            "name": user['name'],
             "avatar": "https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif"
         },
         'message': '成功登录',
@@ -134,13 +100,12 @@ def login(request):
     if not success:
         return Response.error(message)
     # 登录成功
-    print(success)
     res = {
         "success": success,
-        "code": 20000,
+        "code": 200,
         "message": "登录成功",
         "data": {
-            "token": "eyJhbGciOiJIUzUxMiIsInppcCI6IkdaSVAifQ.H4sIAAAAAAAAAKtWKi5NUrJSSkzJzcxT0lFKrShQsjI0MzM0NTI2NTaqBQCV9puSIAAAAA.awM_i4jsrGgU7pJScZ1LKGy2Es82oMa23WezBKAKeDjO27-yccTC_nTPkQmvQvB2_qrTK44GZEXRA9qb1mpD3Q"
+            "token": setToken(message)
         }
     }
     return JsonResponse(res)
@@ -305,3 +270,30 @@ class UserName(View):
         data = rawSQL.query_all_dict(sql)
         print(data)
         return Response.success(data, message='成功获取用户名')
+
+
+class AdminChangePassView(View):
+    def post(self, request):
+        form = LoadJsonData(request.body).get_data()
+        admin_id = form['id']
+        password = form['pass']
+        sql = """
+            update `admin`
+            set `password` = %s
+            where id = %s
+        """
+        rawSQL.execSql(sql, (password, admin_id))
+        return Response.success(message='密码修改成功')
+
+class AdminChangeUsernameView(View):
+    def post(self, request):
+        form = LoadJsonData(request.body).get_data()
+        admin_id = form['id']
+        username = form['username']
+        sql = """
+            update `admin`
+            set `name` = %s
+            where id = %s
+        """
+        rawSQL.execSql(sql, (username, admin_id))
+        return Response.success(message='用户名修改成功')

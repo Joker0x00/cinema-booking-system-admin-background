@@ -5,7 +5,7 @@ from app.utils import rawSQL
 
 
 def UserConfirm(username, password, isAdmin, code_id, code):
-    conn = get_redis_connection('default')
+    conn = get_redis_connection('code')
     c = conn.get(code_id)
     if not c:
         return False, '验证码过期，请重试'
