@@ -9,12 +9,15 @@ def setToken(user_id):
     token = str(uuid.uuid1())
     conn = get_redis_connection('token')
     conn.set(token, user_id, 60 * 60 * 24)
+    print(token)
     return token
 
 def getUser(token):
     conn = get_redis_connection('token')
     t = conn.get(token)
+    print(t)
     if not t:
         return ''
     user_id = str(t, encoding="utf-8")
+    print(user_id)
     return user_id

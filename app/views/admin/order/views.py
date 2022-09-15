@@ -59,14 +59,15 @@ class OrderView(View):
             from `user`
             where `id` = %s
         """
-        user_balance = (rawSQL.query_one_dict(sql, (user_id, )))['balance']
+        user_balance = (rawSQL.query_one_dict(sql, (user_id,)))['balance']
         if user_balance < total_price:
             return Response.error('余额不足')
         # 新增订单
         sql = 'insert into `order`' \
               '(id, show_id, choose_seat, user_id, create_time, num, total_price, status) ' \
               'VALUES' \
-              ' ("{}", "{}", "{}", "{}" ,"{}", "{}", "{}", "{}")'.format(uuid.uuid1(), show_id, choose_seat, user_id, timezone.now(), num, total_price, status)
+              ' ("{}", "{}", "{}", "{}" ,"{}", "{}", "{}", "{}")'.format(uuid.uuid1(), show_id, choose_seat, user_id,
+                                                                         timezone.now(), num, total_price, status)
         rawSQL.execSql(sql)
         # 更新show的座位布局
         sql = """
@@ -115,7 +116,7 @@ class OrderRefund(View):
                 on `user`.id = `order`.user_id
             where `order`.id = %s
         """
-        info = rawSQL.query_one_dict(sql, (id, ))
+        info = rawSQL.query_one_dict(sql, (id,))
         user_id = info['user_id']
         user_balance = info['user_balance']
         user_balance += info['total_price']
@@ -132,3 +133,24 @@ class OrderRefund(View):
         """
         rawSQL.execSql(sql, params=(id,))
         return Response.success(message='退票成功')
+
+
+def recharge(request):
+    if request.method == 'POST':
+        form = LoadJsonData(request.body).get_data()
+        user_id = form.get('id', '')
+        plus = form.get('plus', '')
+        try:
+            plus = float(plus)
+        except Exception as e:
+            plus = 0.0
+            return Response.error('数据格式错误')
+        sql = """
+            update `user`
+            set `balance` = %s + `balance`
+            where `id` = %s
+        """
+        rawSQL.execSql(sql, (plus, user_id))
+        return Response.success('充值成功')
+    else:
+        return Response.error('请求方式错误')

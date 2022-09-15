@@ -147,3 +147,31 @@ class ShowDetail(View):
         data = rawSQL.query_all_dict(sql, params=(movie_id, room_id))
         print(data)
         return Response.success(data, message='成功获取放映数据')
+
+
+def getAllShow(request):
+    movie_id = request.GET.get('movie_id', '')
+    print(movie_id)
+    if not movie_id:
+        return Response.error('缺少参数')
+    sql = """
+        select `show`.`id` AS `id`,`movie`.`name` AS `movieName`,`movie`.`length` AS `length`,
+        `room`.`name` AS `roomName`,`room`.`size` AS `size`,`room`.`column` AS `column`,`room`.`row` AS `row`,
+        `show`.`start_time` AS `start_time`,`show`.`price` AS `price`,`movie`.`id` AS `movie_id`,`room`.`id` AS `room_id`,
+        `show`.`seat_layout` AS `seat_layout` from ((`show` join `room` on((`show`.`room` = `room`.`id`))) join `movie` 
+        on((`show`.`movie` = `movie`.`id`)))
+        where `movie`.`id` = %s
+        order by `show`.`start_time`
+    """
+    data = rawSQL.query_all_dict(sql, (movie_id, ))
+    print(data)
+    return Response.success(data)
+
+
+def getSeatInfo(request):
+    show_id = request.GET.get('show_id', '')
+    if not show_id:
+        return Response.error('缺少参数')
+    sql = """
+        select `id`, `price`, `seat_layout`
+    """

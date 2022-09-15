@@ -14,6 +14,11 @@ from app.utils.loadData import LoadJsonData
 from app.utils.response import Response
 from app.utils import rawSQL
 
+def getAllMoive(request):
+    sql = 'select * from movie'
+    res = rawSQL.query_all_dict(sql)
+    return JsonResponse(Response(code=200, success=True, message='成功获取电影信息', data=res).normal())
+
 class MovieTable(View):
     def get(self, request):
         sql = 'select id, `id` as value, `name` as text, `name` as label from movie'

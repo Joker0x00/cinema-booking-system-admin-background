@@ -8,11 +8,10 @@ def UserConfirm(username, password, isAdmin, code_id, code):
     conn = get_redis_connection('code')
     c = conn.get(code_id)
     if not c:
-        return False, '验证码过期，请重试'
+        return False, '验证码过期，请重试', ''
     c = str(c,  encoding="utf-8")
-    print(code)
     if c != code.upper():
-        return False, '验证码错误'
+        return False, '验证码错误', ''
     # 管理员
     if isAdmin:
         sql = """
@@ -22,11 +21,11 @@ def UserConfirm(username, password, isAdmin, code_id, code):
         """
         user = rawSQL.query_all_dict(sql, (username, ))
         if not len(user):
-            return False, '用户名不存在'
+            return False, '用户名不存在', ''
         user = user[0]
         if password != user['password']:
-            return False, '密码错误'
-        return True, user['id']
+            return False, '密码错误', ''
+        return True, user['id'], 'admin', ''
     # 普通用户
     else:
         sql = """
@@ -36,9 +35,8 @@ def UserConfirm(username, password, isAdmin, code_id, code):
                 """
         user = rawSQL.query_all_dict(sql, (username,))
         if not len(user):
-            return False, '用户名不存在'
+            return False, '用户名不存在', ''
         user = user[0]
-        print(user)
         if password != user['password']:
-            return False, '密码错误'
-        return True, user['id']
+            return False, '密码错误', ''
+        return True, user['id'], 'user'

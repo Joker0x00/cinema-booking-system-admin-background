@@ -20,69 +20,136 @@ from app.utils.TokenService import getUser
 from app.utils import rawSQL
 def get_user_info(request):
     user_token = request.GET.get('token')
+    role = request.GET.get('role')
     user_id = getUser(user_token)
+    print(role)
     if not user_id:
         return Response.error('登录过期，请重新登陆')
-    sql = """
-        select `name`, `password`, `role`
-        from `admin`
-        where `id` = %s
-    """
-    users = rawSQL.query_all_dict(sql, (user_id, ))
-    if not len(users):
-        return Response.error('登录过期，请重新登录')
-    user = users[0]
+    if role == 'admin':
+        sql = """
+            select `name`, `password`, `role`
+            from `admin`
+            where `id` = %s
+        """
+        users = rawSQL.query_all_dict(sql, (user_id, ))
+        if not len(users):
+            return Response.error('登录过期，请重新登录')
+        user = users[0]
 
-    res = {
-        'code': 200,
-        'data': {
-            "routes": [
-                "A",
-                "User",
-                "Category",
-                "Discount",
-                "ActivityEdit",
-                "CouponRule",
-                "Product",
-                "Activity",
-                "CouponAdd",
-                "Trademark",
-                "Attr",
-                "ActivityAdd",
-                "Test3",
-                "Test2",
-                "CouponEdit",
-                "OrderShow",
-                "Test",
-                "Permission",
-                "Spu",
-                "UserList",
-                "ClientUser",
-                "consumer",
-                "Order",
-                "Coupon",
-                "test123321",
-                "Banner",
-                "Acl",
-                "ActivityRule",
-                "Role",
-                "RoleAuth",
-                "Test1",
-                "Refund",
-                "consumerlist",
-                "OrderList",
-                "Sku",
-                "TradeMark"
-            ],
-            "role": user['role'],
-            "id": user_id,
-            "name": user['name'],
-            "avatar": "https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif"
-        },
-        'message': '成功登录',
-        'success': True
-    }
-    return JsonResponse(res)
+        res = {
+            'code': 200,
+            'data': {
+                "routes": [
+                    "A",
+                    "User",
+                    "Category",
+                    "Discount",
+                    "ActivityEdit",
+                    "CouponRule",
+                    "Product",
+                    "Activity",
+                    "CouponAdd",
+                    "Trademark",
+                    "Attr",
+                    "ActivityAdd",
+                    "Test3",
+                    "Test2",
+                    "CouponEdit",
+                    "OrderShow",
+                    "Test",
+                    "Permission",
+                    "Spu",
+                    "UserList",
+                    "ClientUser",
+                    "consumer",
+                    "Order",
+                    "Coupon",
+                    "test123321",
+                    "Banner",
+                    "Acl",
+                    "ActivityRule",
+                    "Role",
+                    "RoleAuth",
+                    "Test1",
+                    "Refund",
+                    "consumerlist",
+                    "OrderList",
+                    "Sku",
+                    "TradeMark"
+                ],
+                "role": user['role'],
+                "id": user_id,
+                "name": user['name'],
+                "avatar": "https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif"
+            },
+            'message': '成功登录',
+            'success': True
+        }
+        return JsonResponse(res)
+    else:
+        sql = """
+                    select `name`, `password`, `sex`, `phone_number`, `balance`
+                    from `user`
+                    where `id` = %s
+                """
+        users = rawSQL.query_all_dict(sql, (user_id,))
+        if not len(users):
+            return Response.error('登录过期，请重新登录')
+        user = users[0]
+
+        res = {
+            'code': 200,
+            'data': {
+                "routes": [
+                    "A",
+                    "User",
+                    "Category",
+                    "Discount",
+                    "ActivityEdit",
+                    "CouponRule",
+                    "Product",
+                    "Activity",
+                    "CouponAdd",
+                    "Trademark",
+                    "Attr",
+                    "ActivityAdd",
+                    "Test3",
+                    "Test2",
+                    "CouponEdit",
+                    "OrderShow",
+                    "Test",
+                    "Permission",
+                    "Spu",
+                    "UserList",
+                    "ClientUser",
+                    "consumer",
+                    "Order",
+                    "Coupon",
+                    "test123321",
+                    "Banner",
+                    "Acl",
+                    "ActivityRule",
+                    "Role",
+                    "RoleAuth",
+                    "Test1",
+                    "Refund",
+                    "consumerlist",
+                    "OrderList",
+                    "Sku",
+                    "TradeMark"
+                ],
+                "role": 'user',
+                "id": user_id,
+                "name": user['name'],
+                "avatar": "https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif",
+                "sex": user['sex'],
+                "phone_number": user['phone_number'],
+                "balance": user['balance']
+            },
+            'message': '成功登录',
+            'success': True
+        }
+        return JsonResponse(res)
 
 # 登录
 def login(request):
@@ -95,7 +162,7 @@ def login(request):
     print(data)
     if not (username != '' and password != '' and isAdmin != '' and code_id != '' and code != ''):
         return Response.error('登录信息不全')
-    success, message = UserConfirm(username, password, isAdmin, code_id, code)
+    success, message, role = UserConfirm(username, password, isAdmin, code_id, code)
     # 登录失败
     if not success:
         return Response.error(message)
@@ -105,7 +172,8 @@ def login(request):
         "code": 200,
         "message": "登录成功",
         "data": {
-            "token": setToken(message)
+            "token": setToken(message),
+            "role": role
         }
     }
     return JsonResponse(res)
@@ -297,3 +365,65 @@ class AdminChangeUsernameView(View):
         """
         rawSQL.execSql(sql, (username, admin_id))
         return Response.success(message='用户名修改成功')
+
+def validateName(username=None, adminname=None):
+    if username:
+        sql = """
+            select * from `user`
+            where `name` = %s
+        """
+        data = rawSQL.query_all_dict(sql, (username,))
+        exist = len(data)
+        if not exist or exist == 1 and data[0]['name'] == username:
+            return True
+        else:
+            return False
+    elif adminname:
+        sql = """
+            select * from `admin`
+            where `name` = %s
+        """
+        data = rawSQL.query_all_dict(sql, (adminname,))
+        exist = len(data)
+        if not exist or exist == 1 and data[0]['name'] == adminname:
+            return True
+        else:
+            return False
+    else:
+        return False
+
+
+def editUserInfo(request):
+    if request.method == 'POST':
+        form = LoadJsonData(request.body).get_data().get('form', {})
+        user_id = form.get('id', '')
+        username = form.get('username', '')
+        sex = form.get('sex', '')
+        phone_number = form.get('phone_number', '')
+        if not validateName(username=username):
+            return Response.error(201, '用户名已被占用')
+        sql = """
+            update `user`
+            set `name` = %s, `sex` = %s, `phone_number` = %s
+            where `id` = %s
+        """
+        rawSQL.execSql(sql, (username, sex, phone_number, user_id))
+        return Response.success('修改成功')
+
+    else:
+        Response.error('请求方式错误')
+
+def userChangePass(request):
+    if request.method == 'POST':
+        form = LoadJsonData(request.body).get_data()
+        user_id = form['id']
+        password = form['pass']
+        sql = """
+                    update `user`
+                    set `password` = %s
+                    where id = %s
+                """
+        rawSQL.execSql(sql, (password, user_id))
+        return Response.success(message='密码修改成功')
+    else:
+        return Response.error('请求方式错误')
