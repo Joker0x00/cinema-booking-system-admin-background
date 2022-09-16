@@ -165,7 +165,7 @@ def login(request):
     success, message, role = UserConfirm(username, password, isAdmin, code_id, code)
     # 登录失败
     if not success:
-        return Response.error(message)
+        return Response.error(code=404, message=message)
     # 登录成功
     res = {
         "success": success,

@@ -1,5 +1,7 @@
 # Author: wy
 # Time: 2022/9/4 20:52
+import datetime
+
 from django.views import View
 from app import modelViews
 from app.models import Show, Movie, Room
@@ -30,7 +32,7 @@ class ShowView(View):
             if params.get('value', ''):
                 condition[params['key'] + ('__contains' if vague else '')] = params['value']
         print(condition)
-        raw_data = modelViews.ShowView.objects.filter(**condition).values()
+        raw_data = modelViews.ShowView.objects.filter(**condition).values().order_by('-start_time')
         raw_data = list(raw_data)
         cnt = len(raw_data)
         start, end = Pagination(current_page=current_page, limit=limit, count=cnt).get_result()
@@ -55,11 +57,13 @@ class ShowView(View):
         dateTime = form['start_time'].split('T')
         date = dateTime[0]
         time = dateTime[1].split('.')[0]
-        print(date + ' ' + time)
+        t = datetime.datetime.strptime(date + ' ' + time, "%Y-%m-%d %H:%M:%S")
+        t_new = t + datetime.timedelta(hours=8)
+        print(t_new)
         sql = 'insert into `show`' \
               '(id, movie, room, start_time, price, seat_layout) ' \
               'VALUES' \
-              ' ("{}", "{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), movie_id, room_id, date + ' ' + time, form['price'], seat_layout)
+              ' ("{}", "{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), movie_id, room_id, t_new, form['price'], seat_layout)
         print(sql)
         execSql(sql)
         return Response.success(message='新增成功')

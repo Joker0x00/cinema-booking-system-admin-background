@@ -38,7 +38,7 @@ class Response:
         })
 
     @staticmethod
-    def error(code=None, message="请求失败"):
+    def error(message="请求失败", code=None):
         if code is None:
             code = 404
         return JsonResponse({

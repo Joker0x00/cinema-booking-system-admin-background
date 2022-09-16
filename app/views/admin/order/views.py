@@ -31,7 +31,6 @@ class OrderView(View):
         for params in searchParams:
             if params.get('value', ''):
                 condition[params['key'] + ('__contains' if vague else '')] = params['value']
-        print(condition)
         # 1
         raw_data = modelViews.OrderDetail.objects.filter(**condition).values()
         raw_data = list(raw_data)
@@ -154,3 +153,18 @@ def recharge(request):
         return Response.success('充值成功')
     else:
         return Response.error('请求方式错误')
+
+
+def getUserOrder(request):
+    user_id = request.GET.get('user_id', '')
+    if not user_id:
+        return Response.error('缺少参数')
+    sql = """
+        select `order`.`id` AS `id`,`movie`.`name` AS `movieName`,`show`.`start_time` AS `start_time`,`show`.`price` AS `price`,`show`.`id` AS `show_id`,`order`.`choose_seat` AS `choose_seat`,`user`.`id` AS `user_id`,`user`.`name` AS `username`,`order`.`create_time` AS `create_time`,`room`.`name` AS `roomName`,`room`.`id` AS `room_id`,`movie`.`id` AS `movie_id`,`order`.`total_price` AS `total_price`,`order`.`num` AS `num`,`order`.`status` AS `status` from ((((`order` join `user` on((`order`.`user_id` = `user`.`id`))) join `show` on((`order`.`show_id` = `show`.`id`))) join `movie` on((`show`.`movie` = `movie`.`id`))) join `room` on((`show`.`room` = `room`.`id`)))
+        where `order`.`user_id` = %s
+        order by `order`.`create_time` desc 
+    """
+    print(user_id)
+    data = rawSQL.query_all_dict(sql, (user_id, ))
+    print(data)
+    return Response.success(data)
