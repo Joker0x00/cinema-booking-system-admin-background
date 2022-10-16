@@ -6,7 +6,7 @@ import uuid
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views import View
-
+from django.db import transaction
 from app.utils.Pageination import Pagination
 from app.models import Order
 from app import modelViews
@@ -44,47 +44,58 @@ class OrderView(View):
         return JsonResponse(Response(code=200, data=data, message='成功获取订单信息').normal(), safe=False)
 
     def post(self, request):
-        form = LoadJsonData(request.body).get_data().get('form', {})
-        show_id = form['show_id']
-        choose_seat = form['choose_seat']
-        user_id = form['user_id']
-        num = form['num']
-        total_price = float(form['total_price'])
-        status = form['status']
-        layout = form['layout']
-        # 余额是否够
-        sql = """
-            select `balance`
-            from `user`
-            where `id` = %s
-        """
-        user_balance = (rawSQL.query_one_dict(sql, (user_id,)))['balance']
-        if user_balance < total_price:
-            return Response.error('余额不足')
-        # 新增订单
-        sql = 'insert into `order`' \
-              '(id, show_id, choose_seat, user_id, create_time, num, total_price, status) ' \
-              'VALUES' \
-              ' ("{}", "{}", "{}", "{}" ,"{}", "{}", "{}", "{}")'.format(uuid.uuid1(), show_id, choose_seat, user_id,
-                                                                         timezone.now(), num, total_price, status)
-        rawSQL.execSql(sql)
-        # 更新show的座位布局
-        sql = """
-            update `show`
-            set `seat_layout` = %s
-            where `id` = %s
-        """
-        rawSQL.execSql(sql, (layout, show_id))
-        # 用户余额划款
-        user_balance -= decimal.Decimal(total_price)
-        print(user_balance)
-        sql = """
-            update `user`
-            set `balance` = %s
-            where `id` = %s
-        """
-        rawSQL.execSql(sql, (user_balance, user_id))
-        return Response.success(message='新增成功')
+        with transaction.atomic():
+            # 事务保存点
+            save_id = transaction.savepoint()
+            try:
+                form = LoadJsonData(request.body).get_data().get('form', {})
+                show_id = form['show_id']
+                choose_seat = form['choose_seat']
+                user_id = form['user_id']
+                num = form['num']
+                total_price = float(form['total_price'])
+                status = form['status']
+                layout = form['layout']
+                # 余额是否够
+                sql = """
+                    select `balance`
+                    from `user`
+                    where `id` = %s
+                """
+                user_balance = (rawSQL.query_one_dict(sql, (user_id,)))['balance']
+                if user_balance < total_price:
+                    return Response.error('余额不足')
+                # 新增订单
+                sql = 'insert into `order`' \
+                      '(id, show_id, choose_seat, user_id, create_time, num, total_price, status) ' \
+                      'VALUES' \
+                      ' ("{}", "{}", "{}", "{}" ,"{}", "{}", "{}", "{}")'.format(uuid.uuid1(), show_id, choose_seat,
+                                                                                 user_id,
+                                                                                 timezone.now(), num, total_price,
+                                                                                 status)
+                rawSQL.execSql(sql)
+                # 更新show的座位布局
+                sql = """
+                    update `show`
+                    set `seat_layout` = %s
+                    where `id` = %s
+                """
+                rawSQL.execSql(sql, (layout, show_id))
+                # 用户余额划款
+                user_balance -= decimal.Decimal(total_price)
+                print(user_balance)
+                sql = """
+                    update `user`
+                    set `balance` = %s
+                    where `id` = %s
+                """
+                rawSQL.execSql(sql, (user_balance, user_id))
+            except Exception as e:
+                print(e)
+                transaction.savepoint_rollback(save_id)
+                return Response.error(message='下单失败')
+            transaction.savepoint_commit(save_id)
+            return Response.success(message='新增成功')
 
     def delete(self, request):
         order_id = LoadJsonData(request.body).get_data().get('id', '')
@@ -108,30 +119,81 @@ class OrderRefund(View):
         if not id:
             return Response.error(message='需提供id')
         sql = """
-            select `user`.id as user_id, `user`.balance as user_balance, `order`.total_price as total_price
-            from `user`
-                inner join
-                `order`
-                on `user`.id = `order`.user_id
-            where `order`.id = %s
+        SELECT
+            `order`.id AS order_id, 
+            `show`.id AS show_id, 
+            `order`.status AS order_status, 
+            `order`.choose_seat AS choose_seat, 
+            `show`.seat_layout AS seat_layout, 
+            room.`column` AS col, 
+            room.`row` AS `row`
+        FROM
+            `order`
+            INNER JOIN
+            `show`
+            ON 
+                `order`.show_id = `show`.id
+            INNER JOIN
+             room
+            ON 
+             `show`.room = room.id
+        WHERE
+            `order`.id = %s
         """
-        info = rawSQL.query_one_dict(sql, (id,))
-        user_id = info['user_id']
-        user_balance = info['user_balance']
-        user_balance += info['total_price']
-        sql = """
-            update `user`
-            set `balance` = %s
-            where `id` = %s
-        """
-        rawSQL.execSql(sql, (user_balance, user_id))
-        sql = """
-            update `order`
-            set `status` = '已退票'
-            where `id` = %s
-        """
-        rawSQL.execSql(sql, params=(id,))
-        return Response.success(message='退票成功')
+        data = rawSQL.query_one_dict(sql, (id,))
+        if data['order_status'] == '已退票':
+            return Response.error('操作非法')
+        seat_layout = data['seat_layout']
+        choose_seat = data['choose_seat']
+        seats = choose_seat.split(',')
+        seats = list(reversed(seats))
+        # print(seats)
+        # print(seat_layout, choose_seat)
+        for seat in seats:
+            row = int(seat.split('排')[0]) - 1
+            col = int(seat.split('排')[1].split('座')[0]) - 1
+            # print(row, col)
+            seat_layout = seat_layout[: row * data['col'] + col] + '0' + seat_layout[row * data['col'] + col + 1:]
+            # print(seat_layout)
+        with transaction.atomic():
+            save_id = transaction.savepoint()
+            try:
+                sql = """
+                    update `show`
+                    set `seat_layout` = %s
+                    where `id` = %s
+                """
+                rawSQL.execSql(sql, (seat_layout, data['show_id']))
+                sql = """
+                    select `user`.id as user_id, `user`.balance as user_balance, `order`.total_price as total_price
+                    from `user`
+                        inner join
+                        `order`
+                        on `user`.id = `order`.user_id
+                    where `order`.id = %s
+                """
+                info = rawSQL.query_one_dict(sql, (id,))
+                user_id = info['user_id']
+                user_balance = info['user_balance']
+                user_balance += info['total_price']
+                sql = """
+                    update `user`
+                    set `balance` = %s
+                    where `id` = %s
+                """
+                rawSQL.execSql(sql, (user_balance, user_id))
+                sql = """
+                    update `order`
+                    set `status` = '已退票'
+                    where `id` = %s
+                """
+                rawSQL.execSql(sql, params=(id,))
+            except Exception as e:
+                print(e)
+                transaction.savepoint_rollback(save_id)
+                return Response.error(message='退票失败')
+            transaction.savepoint_commit(save_id)
+            return Response.success(message='退票成功')
 
 
 def recharge(request):
@@ -165,6 +227,34 @@ def getUserOrder(request):
         order by `order`.`create_time` desc 
     """
     print(user_id)
-    data = rawSQL.query_all_dict(sql, (user_id, ))
+    data = rawSQL.query_all_dict(sql, (user_id,))
     print(data)
     return Response.success(data)
+
+
+def remark(request):
+    if request.method != 'POST':
+        return Response.error('请求方式错误')
+    form = LoadJsonData(request.body).get_data().get('form', {})
+    sql = """
+        select `comment_status`
+        from `order`
+        where `id` = %s
+    """
+    comment_status = rawSQL.query_all_dict(sql, (form['order_id'],))[0]['comment_status']
+    if comment_status == '已评论':
+        return Response.success(message='已评论', code=200)
+    sql = """
+         insert into `comment`
+          (id, score, comments, from_user_id, create_time, movie)
+          values
+           (%s, %s, %s, %s, %s, %s)    
+    """
+    rawSQL.execSql(sql, (uuid.uuid1(), form['score'], form['text'], form['user_id'], timezone.now(), form['movie_id']))
+    sql = """
+        update `order`
+        set comment_status = '已评论'
+        where `id` = %s
+    """
+    rawSQL.execSql(sql, (form['order_id'],))
+    return Response.success('评论成功')

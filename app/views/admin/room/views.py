@@ -112,7 +112,7 @@ class RoomDetail(View):
         if not movie_id:
             return Response.error('需要电影id')
         sql = """
-            SELECT
+            SELECT DISTINCT
                 room.id AS id, 
                 room.`name` AS `name`
             FROM
@@ -125,7 +125,8 @@ class RoomDetail(View):
                     movie
                 ON 
                     `show`.movie = movie.id
-            WHERE `show`.`movie` = %s
+            WHERE `show`.`movie` = %s and `show`.`status` = '即将上映'
         """
         data = rawSQL.query_all_dict(sql, params=(movie_id,))
+        print(data)
         return Response.success(data=data, message='成功获取放映厅数据')

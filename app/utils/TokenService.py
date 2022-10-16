@@ -5,8 +5,8 @@ import uuid
 from django_redis import get_redis_connection
 
 
-def setToken(user_id):
-    token = str(uuid.uuid1())
+def setToken(user_id, role):
+    token = str(uuid.uuid1()) + role[0]
     conn = get_redis_connection('token')
     conn.set(token, user_id, 60 * 60 * 24)
     print(token)

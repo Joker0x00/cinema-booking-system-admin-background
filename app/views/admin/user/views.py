@@ -1,5 +1,6 @@
 # Author: wy
 # Time: 2022/8/27 10:36
+import decimal
 import uuid
 
 from django.http import JsonResponse
@@ -18,66 +19,29 @@ from app.utils.UserConfirmService import UserConfirm
 from app.utils.TokenService import setToken
 from app.utils.TokenService import getUser
 from app.utils import rawSQL
+
+
 def get_user_info(request):
     user_token = request.GET.get('token')
-    role = request.GET.get('role')
+    role = user_token[len(user_token) - 1]
     user_id = getUser(user_token)
-    print(role)
     if not user_id:
-        return Response.error('登录过期，请重新登陆')
-    if role == 'admin':
+        return Response.error('token过期，请重新登陆')
+    if role == 'a':
         sql = """
             select `name`, `password`, `role`
             from `admin`
             where `id` = %s
         """
-        users = rawSQL.query_all_dict(sql, (user_id, ))
+        users = rawSQL.query_all_dict(sql, (user_id,))
         if not len(users):
-            return Response.error('登录过期，请重新登录')
+            return Response.error('用户不存在，请重新登录')
         user = users[0]
 
         res = {
             'code': 200,
             'data': {
-                "routes": [
-                    "A",
-                    "User",
-                    "Category",
-                    "Discount",
-                    "ActivityEdit",
-                    "CouponRule",
-                    "Product",
-                    "Activity",
-                    "CouponAdd",
-                    "Trademark",
-                    "Attr",
-                    "ActivityAdd",
-                    "Test3",
-                    "Test2",
-                    "CouponEdit",
-                    "OrderShow",
-                    "Test",
-                    "Permission",
-                    "Spu",
-                    "UserList",
-                    "ClientUser",
-                    "consumer",
-                    "Order",
-                    "Coupon",
-                    "test123321",
-                    "Banner",
-                    "Acl",
-                    "ActivityRule",
-                    "Role",
-                    "RoleAuth",
-                    "Test1",
-                    "Refund",
-                    "consumerlist",
-                    "OrderList",
-                    "Sku",
-                    "TradeMark"
-                ],
-                "role": user['role'],
+                "roles": user['role'].split(','),
                 "id": user_id,
                 "name": user['name'],
                 "avatar": "https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif"
@@ -94,51 +58,14 @@ def get_user_info(request):
                 """
         users = rawSQL.query_all_dict(sql, (user_id,))
         if not len(users):
-            return Response.error('登录过期，请重新登录')
+            print(user_id)
+            return Response.error('用户不存在，请重新登录')
         user = users[0]
 
         res = {
             'code': 200,
             'data': {
-                "routes": [
-                    "A",
-                    "User",
-                    "Category",
-                    "Discount",
-                    "ActivityEdit",
-                    "CouponRule",
-                    "Product",
-                    "Activity",
-                    "CouponAdd",
-                    "Trademark",
-                    "Attr",
-                    "ActivityAdd",
-                    "Test3",
-                    "Test2",
-                    "CouponEdit",
-                    "OrderShow",
-                    "Test",
-                    "Permission",
-                    "Spu",
-                    "UserList",
-                    "ClientUser",
-                    "consumer",
-                    "Order",
-                    "Coupon",
-                    "test123321",
-                    "Banner",
-                    "Acl",
-                    "ActivityRule",
-                    "Role",
-                    "RoleAuth",
-                    "Test1",
-                    "Refund",
-                    "consumerlist",
-                    "OrderList",
-                    "Sku",
-                    "TradeMark"
-                ],
-                "role": 'user',
+                "roles": ['user'],
                 "id": user_id,
                 "name": user['name'],
                 "avatar": "https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif",
@@ -150,6 +77,7 @@ def get_user_info(request):
             'success': True
         }
         return JsonResponse(res)
+
 
 # 登录
 def login(request):
@@ -172,11 +100,12 @@ def login(request):
         "code": 200,
         "message": "登录成功",
         "data": {
-            "token": setToken(message),
+            "token": setToken(message, role),
             "role": role
         }
     }
     return JsonResponse(res)
+
 
 # 登出
 def logout(request):
@@ -289,15 +218,19 @@ class UserView(View):
     def post(self, request):
         form = LoadJsonData(request.body).get_data().get('form', {})
         name = form.get('name', '')
+        print(name)
         password = form.get('password', '')
         sex = form.get('sex', '')
         birthday = form.get('birthday', '')
         phone_number = form.get('form_number', '')
-        balance = form.get('balance', 0)
+        balance = decimal.Decimal(form.get('balance', 0.00))
+        Id = uuid.uuid1()
+        if not validateName(username=name, Id=Id):
+            return Response.error(message='用户名已被占用', code=201)
         sql = 'insert into `user`' \
               '(`id`, `name`, `password`, `sex`, `phone_number`, `balance`) ' \
               'VALUES' \
-              '("{}", "{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), name, password, sex, birthday, phone_number, balance)
+              '("{}", "{}", "{}", "{}", "{}", "{}")'.format(Id, name, password, sex, phone_number, balance)
         rawSQL.execSql(sql)
         return Response.success(message='新增成功')
 
@@ -327,7 +260,7 @@ class UserView(View):
         if not data:
             return Response(code=404, success=False, message='删除失败，检索不到').jsonResponse()
         sql = 'delete from `user` where `id`=%s'
-        params = (user_id, )
+        params = (user_id,)
         rawSQL.execSql(sql, params)
         return Response(code=200, success=True, message='删除成功').jsonResponse()
 
@@ -353,6 +286,7 @@ class AdminChangePassView(View):
         rawSQL.execSql(sql, (password, admin_id))
         return Response.success(message='密码修改成功')
 
+
 class AdminChangeUsernameView(View):
     def post(self, request):
         form = LoadJsonData(request.body).get_data()
@@ -366,7 +300,8 @@ class AdminChangeUsernameView(View):
         rawSQL.execSql(sql, (username, admin_id))
         return Response.success(message='用户名修改成功')
 
-def validateName(username=None, adminname=None):
+
+def validateName(username=None, adminname=None, Id=None):
     if username:
         sql = """
             select * from `user`
@@ -374,7 +309,8 @@ def validateName(username=None, adminname=None):
         """
         data = rawSQL.query_all_dict(sql, (username,))
         exist = len(data)
-        if not exist or exist == 1 and data[0]['name'] == username:
+        print(exist)
+        if not exist or exist == 1 and data[0]['id'] == Id:
             return True
         else:
             return False
@@ -385,7 +321,7 @@ def validateName(username=None, adminname=None):
         """
         data = rawSQL.query_all_dict(sql, (adminname,))
         exist = len(data)
-        if not exist or exist == 1 and data[0]['name'] == adminname:
+        if not exist or exist == 1 and data[0]['id'] == Id:
             return True
         else:
             return False
@@ -400,7 +336,7 @@ def editUserInfo(request):
         username = form.get('username', '')
         sex = form.get('sex', '')
         phone_number = form.get('phone_number', '')
-        if not validateName(username=username):
+        if not validateName(username=username, Id=user_id):
             return Response.error(201, '用户名已被占用')
         sql = """
             update `user`
@@ -412,6 +348,7 @@ def editUserInfo(request):
 
     else:
         Response.error('请求方式错误')
+
 
 def userChangePass(request):
     if request.method == 'POST':

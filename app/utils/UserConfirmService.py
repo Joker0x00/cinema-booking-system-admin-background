@@ -25,7 +25,7 @@ def UserConfirm(username, password, isAdmin, code_id, code):
         user = user[0]
         if password != user['password']:
             return False, '密码错误', ''
-        return True, user['id'], 'admin', ''
+        return True, user['id'], 'admin'
     # 普通用户
     else:
         sql = """

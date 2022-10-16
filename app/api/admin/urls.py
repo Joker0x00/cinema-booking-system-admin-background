@@ -12,5 +12,6 @@ urlpatterns = [
     path('room/', include(base_path + 'room.urls')),
     path('show/', include(base_path + 'show.urls')),
     path('order/', include(base_path + 'order.urls')),
-    path('comment/', include(base_path + 'comment.urls'))
+    path('comment/', include(base_path + 'comment.urls')),
+    path('action/', include(base_path + 'action.urls'))
 ]

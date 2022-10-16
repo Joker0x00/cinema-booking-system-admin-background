@@ -17,7 +17,24 @@ from app.utils import rawSQL
 def getAllMoive(request):
     sql = 'select * from movie'
     res = rawSQL.query_all_dict(sql)
-    return JsonResponse(Response(code=200, success=True, message='成功获取电影信息', data=res).normal())
+    data = []
+    for m in res:
+        m_id = m['id']
+        sql = """
+            select `score`, `movie`
+            from `comment`
+            where `movie` = %s
+        """
+        scores = rawSQL.query_all_dict(sql, (m_id,))
+        score = 0
+        num = len(scores)
+        for s in scores:
+            score += s['score']
+        if num:
+            score /= num
+        m['score'] = round(score, 1)
+        data.append(m)
+    return JsonResponse(Response(code=200, success=True, message='成功获取电影信息', data=data).normal())
 
 class MovieTable(View):
     def get(self, request):
