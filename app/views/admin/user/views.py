@@ -2,23 +2,22 @@
 # Time: 2022/8/27 10:36
 import decimal
 import uuid
+from hashlib import md5
 
 from django.http import JsonResponse
 from django.utils import timezone
-from django_redis import get_redis_connection
-from django.views.decorators.csrf import csrf_exempt
 
 from app.utils.Pageination import Pagination
 from app.utils.response import Response
 from app.utils.loadData import LoadJsonData
-from app.utils import rawSQL
-from app.utils.CodeService import check_code
+
 from django.views import View
 from app.models import Admin, User
 from app.utils.UserConfirmService import UserConfirm
 from app.utils.TokenService import setToken
 from app.utils.TokenService import getUser
 from app.utils import rawSQL
+from app.utils.InputCheck import CommonPattern
 
 
 def get_user_info(request):
@@ -82,15 +81,30 @@ def get_user_info(request):
 # 登录
 def login(request):
     data = LoadJsonData(request.body).get_data()
-    username = data.get('username', '')
-    password = data.get('password', '')
-    isAdmin = data.get('isAdmin', '')
-    code = data.get('code', '')
-    code_id = data.get('code_id', '')
-    print(data)
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    try:
+        isAdmin = bool(data.get('isAdmin', False))
+    except Exception as e:
+        return Response.error('isAdmin类型错误')
+
+    code = data.get('code', '').strip()
+    code_id = data.get('code_id', '').strip()
+
     if not (username != '' and password != '' and isAdmin != '' and code_id != '' and code != ''):
         return Response.error('登录信息不全')
+
+    if not CommonPattern.confirm(CommonPattern.codePattern, code):
+        return Response.error('验证码格式错误')
+
+    if len(username) > 50:
+        return Response.error('用户名格式错误')
+
+    if len(password) > 50:
+        return Response.error('密码格式错误')
+
     success, message, role = UserConfirm(username, password, isAdmin, code_id, code)
+
     # 登录失败
     if not success:
         return Response.error(code=404, message=message)
@@ -120,8 +134,12 @@ def logout(request):
 
 class AdministratorView(View):
     def get(self, request):
-        key = request.GET.get('key', '')
-        sql = 'select * from admin where `name` like "{}"'.format('%' + key + '%')
+        key = request.GET.get('key', '').strip()
+
+        if len(key) > 50:
+            return Response.error('关键字过长')
+
+        sql = 'select `id`, `name`, `create_time`, `role` from admin where `name` like "{}"'.format('%' + key + '%')
         rows = rawSQL.query_all_dict(sql)
         cnt = len(rows)
         data = {
@@ -132,44 +150,90 @@ class AdministratorView(View):
 
     def post(self, request):
         form = LoadJsonData(request.body).get_data().get('form', {})
-        name = form['name']
-        password = form['password']
-        raw_roles = form['role']
+
+        name = form['name'].strip()
+        if not CommonPattern.confirm(CommonPattern.usernamePattern, name):
+            return Response.error('用户名格式错误')
+
+        if not validateName(adminname=name):
+            return Response.error('用户名重复')
+
+        password = str(form['password']).strip()
+        print(password)
+        if not CommonPattern.confirm(CommonPattern.passwordPattern, password):
+            return Response.error('密码格式错误')
+
+        raw_roles = list(form['role'])
+
+        if len(raw_roles) <= 0:
+            return Response.error('角色列表为空')
+
+        ROLES = ['superAdmin', 'film show manager', 'Comment manager', 'ticket seller']
+
         roles = ''
         create_time = timezone.now()
         for role in raw_roles:
             if role == 'superAdmin':
                 roles = 'superAdmin,'
                 break
+            if role not in ROLES:
+                return Response.error('角色格式错误')
             roles += role + ','
         if roles[len(roles) - 1] == ',':
             roles = roles[:-1]
         sql = 'insert into `admin`' \
               '(`id`, `name`, `password`, `role`, `create_time`) ' \
               'VALUES' \
-              ' ("{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), name, password, roles, create_time)
+              ' ("{}", "{}", "{}", "{}", "{}")'.format(uuid.uuid1(), name, md5(password.encode("utf-8")).hexdigest(),
+                                                       roles, create_time)
         rawSQL.execSql(sql)
         return Response.success(message='新增成功')
 
     def put(self, request):
         raw_form = LoadJsonData(request.body).get_data().get('form', {})
-        form = {
-            'id': raw_form.get('id', ''),
-            'name': raw_form.get('name', ''),
-            'password': raw_form.get('password', ''),
-            'role': raw_form.get('role', ''),
-        }
+        try:
+            form = {
+                'id': str(raw_form.get('id', '')).strip(),
+                'name': str(raw_form.get('name', '')).strip(),
+                'password': str(raw_form.get('password', '')).strip(),
+                'role': list(raw_form.get('role', '')),
+            }
+        except Exception as e:
+            return Response.error('参数类型错误')
+
+        if not CommonPattern.confirm(CommonPattern.usernamePattern, form['name']):
+            return Response.error('用户名格式错误')
+
+        if not validateName(adminname=form['name'], Id=form['id']):
+            return Response.error('用户名重复')
+
+        if form['password'] != '' and not CommonPattern.confirm(CommonPattern.passwordPattern, form['password']):
+            return Response.error('密码格式错误')
+
+        if len(form['role']) <= 0:
+            return Response.error('角色列表为空')
+
+        ROLES = ['superAdmin', 'film show manager', 'Comment manager', 'ticket seller']
+
         roles = ''
         for role in form['role']:
             if role == 'superAdmin':
                 roles = 'superAdmin,'
                 break
+            print(role)
+            if role not in ROLES:
+                return Response.error('角色格式错误')
             roles += role + ','
         if roles[len(roles) - 1] == ',':
             roles = roles[:-1]
         form['role'] = roles
-        sql = 'update `admin` set `name`=%s, `password`=%s, `role`=%s where `id`=%s'
-        rawSQL.execSql(sql=sql, params=(form['name'], form['password'], form['role'], form['id']))
+        if form['password'] == '':
+            sql = 'update `admin` set `name`=%s, `role`=%s where `id`=%s'
+            rawSQL.execSql(sql=sql, params=(form['name'], form['role'], form['id']))
+        else:
+            sql = 'update `admin` set `name`=%s, `password`=%s, `role`=%s where `id`=%s'
+            form['password'] = md5(form['password'].encode('utf-8')).hexdigest()
+            rawSQL.execSql(sql=sql, params=(form['name'], form['password'], form['role'], form['id']))
         return JsonResponse(Response(code=200, success=True, message='修改成功').normal())
 
     def delete(self, request):
@@ -191,12 +255,16 @@ class AdministratorView(View):
 class UserView(View):
     def get(self, request):
         # 处理参数
-        current_page = int(request.GET.get('page', 1))
-        limit = int(request.GET.get('limit', 20))
-        vague = request.GET.get('vague', 'false')
+        try:
+            current_page = int(request.GET.get('page', 1))
+            limit = int(request.GET.get('limit', 20))
+            vague = str(request.GET.get('vague', 'false')).strip()
+            searchstring = request.GET.get('searchParams', None)
+        except Exception:
+            return Response.error('参数格式错误')
         vague = True if vague == 'true' else False
-        searchstring = request.GET.get('searchParams', None)
         searchParams = [{'key': '', 'value': ''}]
+
         if searchstring:
             searchParams = eval(searchstring)
         # 处理筛选条件
@@ -204,7 +272,7 @@ class UserView(View):
         for params in searchParams:
             if params.get('value', ''):
                 condition[params['key'] + ('__contains' if vague else '')] = params['value']
-        raw_data = User.objects.filter(**condition).values()
+        raw_data = User.objects.filter(**condition).values('id', 'name', 'sex', 'phone_number', 'balance')
         raw_data = list(raw_data)
         cnt = len(raw_data)
         start, end = Pagination(current_page=current_page, limit=limit, count=cnt).get_result()
@@ -216,36 +284,83 @@ class UserView(View):
         return JsonResponse(Response(code=200, data=data, message='成功获取用户信息').normal(), safe=False)
 
     def post(self, request):
-        form = LoadJsonData(request.body).get_data().get('form', {})
-        name = form.get('name', '')
-        print(name)
-        password = form.get('password', '')
-        sex = form.get('sex', '')
-        birthday = form.get('birthday', '')
-        phone_number = form.get('form_number', '')
-        balance = decimal.Decimal(form.get('balance', 0.00))
+        try:
+
+            form = LoadJsonData(request.body).get_data().get('form', {})
+            name = str(form.get('name', '')).strip()
+            password = str(form.get('password', '')).strip()
+            sex = str(form.get('sex', '')).strip()
+            phone_number = str(form.get('form_number', '')).strip()
+            balance = decimal.Decimal(form.get('balance', 0.00))
+
+        except Exception:
+            return Response.error('参数类型转换错误')
+
+        if not CommonPattern.confirm(CommonPattern.usernamePattern, name):
+            return Response.error('用户名格式错误')
+
+        if not CommonPattern.confirm(CommonPattern.passwordPattern, password):
+            return Response.error('密码格式错误')
+
+        if phone_number != '' and not CommonPattern.confirm(CommonPattern.numberPattern, phone_number):
+            return Response.error('电话号码格式错误')
+
+        if sex != '' and not CommonPattern.confirm(CommonPattern.sexPattern, sex):
+            return Response.error('性别格式错误')
+
+        if not CommonPattern.confirm(CommonPattern.moneyPattern, str(balance)):
+            return Response.error('金额格式错误')
+
         Id = uuid.uuid1()
-        if not validateName(username=name, Id=Id):
+
+        if not validateName(username=name):
             return Response.error(message='用户名已被占用', code=201)
+
         sql = 'insert into `user`' \
               '(`id`, `name`, `password`, `sex`, `phone_number`, `balance`) ' \
               'VALUES' \
-              '("{}", "{}", "{}", "{}", "{}", "{}")'.format(Id, name, password, sex, phone_number, balance)
+              '("{}", "{}", MD5("{}"), "{}", "{}", "{}")'.format(Id, name, password, sex, phone_number, balance)
         rawSQL.execSql(sql)
         return Response.success(message='新增成功')
 
     def put(self, request):
         raw_form = LoadJsonData(request.body).get_data().get('form', {})
-        form = {
-            'id': raw_form.get('id', ''),
-            'name': raw_form.get('name', ''),
-            'password': raw_form.get('password', ''),
-            'sex': raw_form.get('sex', ''),
-            'phone_number': raw_form.get('phone_number', ''),
-            'balance': float(raw_form.get('balance', 0))
-        }
-        sql = 'update `user` set `name`=%s, `password`=%s, `sex`=%s, `phone_number`=%s, `balance`=%s where id=%s'
-        params = (form['name'], form['password'], form['sex'], form['phone_number'], form['balance'], form['id'])
+        try:
+            form = {
+                'id': str(raw_form.get('id', '')).strip(),
+                'name': str(raw_form.get('name', '')).strip(),
+                'password': str(raw_form.get('password', '')).strip(),
+                'sex': str(raw_form.get('sex', '')).strip(),
+                'phone_number': str(raw_form.get('phone_number', '')).strip(),
+                'balance': decimal.Decimal(raw_form.get('balance', 0.00))
+            }
+        except Exception:
+            return Response.error('参数类型转换错误')
+
+        if not CommonPattern.confirm(CommonPattern.usernamePattern, form['name']):
+            return Response.error('用户名格式错误')
+
+        if not validateName(username=form['name'], Id=form['id']):
+            return Response.error('用户名重复')
+
+        if form['password'] != '' and not CommonPattern.codePattern(CommonPattern.passwordPattern, form['password']):
+            return Response.error('密码格式错误')
+
+        if form['phone_number'] != '' and not CommonPattern.confirm(CommonPattern.numberPattern, form['phone_number']):
+            return Response.error('电话号码格式错误')
+
+        if form['sex'] != '' and not CommonPattern.confirm(CommonPattern.sexPattern, form['sex']):
+            return Response.error('性别格式错误')
+
+        if not CommonPattern.confirm(CommonPattern.moneyPattern, str(form['balance'])):
+            return Response.error('余额格式错误')
+
+        if form['password'].strip() == '':
+            sql = 'update `user` set `name`=%s, `sex`=%s, `phone_number`=%s, `balance`=%s where id=%s'
+            params = (form['name'], form['sex'], form['phone_number'], form['balance'], form['id'])
+        else:
+            sql = 'update `user` set `name`=%s, `password`=MD5(%s), `sex`=%s, `phone_number`=%s, `balance`=%s where id=%s'
+            params = (form['name'], form['password'], form['sex'], form['phone_number'], form['balance'], form['id'])
         rawSQL.execSql(sql=sql, params=params)
         return JsonResponse(Response(code=200, success=True, message='修改成功').normal())
 
@@ -269,7 +384,6 @@ class UserName(View):
     def get(self, request):
         sql = 'select `id`, `name` from `user`'
         data = rawSQL.query_all_dict(sql)
-        print(data)
         return Response.success(data, message='成功获取用户名')
 
 
@@ -278,9 +392,13 @@ class AdminChangePassView(View):
         form = LoadJsonData(request.body).get_data()
         admin_id = form['id']
         password = form['pass']
+
+        if not CommonPattern.confirm(CommonPattern.passwordPattern, password):
+            return Response.error('密码格式错误')
+
         sql = """
             update `admin`
-            set `password` = %s
+            set `password` = MD5(%s)
             where id = %s
         """
         rawSQL.execSql(sql, (password, admin_id))
@@ -292,6 +410,13 @@ class AdminChangeUsernameView(View):
         form = LoadJsonData(request.body).get_data()
         admin_id = form['id']
         username = form['username']
+
+        if not CommonPattern.confirm(CommonPattern.usernamePattern, username):
+            return Response.error('用户名格式错误')
+
+        if not validateName(adminname=username, Id=admin_id):
+            return Response.error('用户名重复')
+
         sql = """
             update `admin`
             set `name` = %s
@@ -332,10 +457,23 @@ def validateName(username=None, adminname=None, Id=None):
 def editUserInfo(request):
     if request.method == 'POST':
         form = LoadJsonData(request.body).get_data().get('form', {})
-        user_id = form.get('id', '')
-        username = form.get('username', '')
-        sex = form.get('sex', '')
-        phone_number = form.get('phone_number', '')
+        try:
+            user_id = str(form.get('id', '')).strip()
+            username = str(form.get('username', '')).strip()
+            sex = str(form.get('sex', '')).strip()
+            phone_number = str(form.get('phone_number', '')).strip()
+        except Exception:
+            return Response.error('参数类型转换错误')
+
+        if not CommonPattern.confirm(CommonPattern.usernamePattern, username):
+            return Response.error('用户名格式错误')
+
+        if phone_number != '' and not CommonPattern.confirm(CommonPattern.numberPattern, phone_number):
+            return Response.error('电话号码格式错误')
+
+        if sex != '' and not CommonPattern.confirm(CommonPattern.sexPattern, sex):
+            return Response.error('性别格式错误')
+
         if not validateName(username=username, Id=user_id):
             return Response.error(201, '用户名已被占用')
         sql = """
@@ -353,11 +491,18 @@ def editUserInfo(request):
 def userChangePass(request):
     if request.method == 'POST':
         form = LoadJsonData(request.body).get_data()
-        user_id = form['id']
-        password = form['pass']
+        try:
+            user_id = str(form['id']).strip()
+            password = str(form['pass']).strip()
+        except Exception:
+            return Response.error('参数类型转换错误')
+
+        if not CommonPattern.confirm(CommonPattern.passwordPattern, password):
+            return Response.error('密码格式错误')
+
         sql = """
                     update `user`
-                    set `password` = %s
+                    set `password` = MD5(%s)
                     where id = %s
                 """
         rawSQL.execSql(sql, (password, user_id))

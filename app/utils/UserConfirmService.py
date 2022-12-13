@@ -1,5 +1,6 @@
 # Author: wy
 # Time: 2022/9/10 10:46
+from hashlib import md5
 from django_redis import get_redis_connection
 from app.utils import rawSQL
 
@@ -23,7 +24,7 @@ def UserConfirm(username, password, isAdmin, code_id, code):
         if not len(user):
             return False, '用户名不存在', ''
         user = user[0]
-        if password != user['password']:
+        if md5(password.encode("utf-8")).hexdigest() != user['password']:
             return False, '密码错误', ''
         return True, user['id'], 'admin'
     # 普通用户
@@ -37,6 +38,6 @@ def UserConfirm(username, password, isAdmin, code_id, code):
         if not len(user):
             return False, '用户名不存在', ''
         user = user[0]
-        if password != user['password']:
+        if md5(password.encode("utf-8")).hexdigest() != user['password']:
             return False, '密码错误', ''
         return True, user['id'], 'user'
